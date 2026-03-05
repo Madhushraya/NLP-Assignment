@@ -22,7 +22,7 @@ int main()
 {
     static Dictionary dict;
     
-    int count = load_dictionary(&dict, "lemmas_60k.csv");
+    int count = load_dictionary(&dict, "ngram_freq_dict.csv");
 
     if (count == 0) {
         printf("Failed to load dictionary.\n");
@@ -72,8 +72,12 @@ int main()
         printf("Suggestions:\n");
         int limit = candCount < 10 ? candCount : 10;
         for (int i = 0; i < limit; i++) {
-            printf("%s (dist: %d, freq: %d)\n", candidates[i].word, candidates[i].distance, candidates[i].frequency);
+            if(candidates[i].distance == 0) {
+                printf("%s (exact match, freq: %lld)\n", candidates[i].word, candidates[i].frequency);
+            } else {
+            printf("%s (dist: %d, freq: %lld)\n", candidates[i].word, candidates[i].distance, candidates[i].frequency);
         }
+    }
         if (candCount == 0) printf("No close matches found.\n");
     }
 

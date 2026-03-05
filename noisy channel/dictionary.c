@@ -24,11 +24,11 @@ int load_dictionary(Dictionary *dict, const char *filename)
 
         while (token != NULL)
         {
-            if (c == 1)
+            if (c == 0)
                 strcpy(dict->words[count], token);
 
-            if (c == 3)
-                dict->freq[count] = atoi(token);
+            if (c == 1)
+                dict->freq[count] = atoll(token);
 
             token = strtok(NULL, ",");
             c++;

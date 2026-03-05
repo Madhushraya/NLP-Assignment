@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 #define TABLE_SIZE 100000
 #define MAX_WORD 64
@@ -36,7 +37,7 @@ HashEntry* get_entry(const char *context) {
 
     if (!table[slot]) {
         table[slot] = calloc(1, sizeof(HashEntry));
-        table[slot]->context = _strdup(context);
+        table[slot]->context = strdup(context);
     }
     return table[slot];
 }
@@ -58,7 +59,7 @@ void record(const char *context, const char *next_word) {
     }
 
     NextWord *new_word = malloc(sizeof(NextWord));
-    new_word->word = _strdup(next_word);
+    new_word->word = strdup(next_word);
     new_word->count = 1;
     new_word->next = entry->list;
     entry->list = new_word;
@@ -67,6 +68,23 @@ void record(const char *context, const char *next_word) {
 // Sorts word suggestions by occurrence count (descending)
 int compare_by_count(const void *a, const void *b) {
     return (*(NextWord**)b)->count - (*(NextWord**)a)->count;
+}
+
+// Retrieves the probability of a word given a context with simple smoothing
+double get_prob(const char *context, const char *word) {
+    unsigned int slot = hash(context);
+    while (table[slot] && strcmp(table[slot]->context, context) != 0)
+        slot = (slot + 1) % TABLE_SIZE;
+
+    if (!table[slot] || !table[slot]->list) return 0.000001; 
+
+    NextWord *candidate = table[slot]->list;
+    while (candidate) {
+        if (strcmp(candidate->word, word) == 0)
+            return (double)candidate->count / table[slot]->total;
+        candidate = candidate->next;
+    }
+    return 0.000001; 
 }
 
 // Shows top 5 predictions or prints failure message if context is unknown
@@ -97,6 +115,31 @@ int predict(const char *context, const char *label) {
         printf(" -> %-15s (%.1f%%)\n", sorted[i]->word, (sorted[i]->count * 100.0) / table[slot]->total);
 
     return 1;
+}
+
+// Calculates and prints the perplexity of a sentence
+void compute_perplexity(char **words, int n) {
+    if (n < 2) {
+        printf("\n[Perplexity: N/A (too short)]\n");
+        return;
+    }
+    double log_sum = 0;
+    char ctx[MAX_WORD * 2];
+
+    for (int i = 1; i < n; i++) {
+        double p;
+        if (i >= 2) {
+            sprintf(ctx, "%s %s", words[i-2], words[i-1]);
+            p = get_prob(ctx, words[i]);
+            if (p <= 0.000001) p = get_prob(words[i-1], words[i]);
+        } else {
+            p = get_prob(words[i-1], words[i]);
+        }
+        log_sum += log2(p);
+    }
+    
+    double entropy = -log_sum / (n - 1);
+    printf("\n[Sentence Perplexity: %.2f]\n", pow(2, entropy));
 }
 
 int main() {
@@ -132,7 +175,9 @@ int main() {
         if (n == 0) continue;
         if (strcmp(words[0], "q") == 0) break;
 
-        // sprintf is necessary here to combine words into a single lookup key
+        compute_perplexity(words, n);
+
+        // Predict next word
         if (n >= 2) {
             sprintf(ctx, "%s %s", words[n-2], words[n-1]);
             predict(ctx, "Trigram");

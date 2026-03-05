@@ -6,7 +6,7 @@
 
 typedef struct {
     char words[MAX][MAX_WORD_LENGTH];
-    int freq[MAX];
+    long long freq[MAX];
     int size;
 } Dictionary;
 

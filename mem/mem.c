@@ -12,7 +12,7 @@
 typedef struct {
     char text[MAX_SENTENCE_LEN];
     double features[NUM_FEATURES];
-    double score;
+    double probability;  // Probabilistic score (P(y=1|x))
     int label;           // 1 -> important, 0 -> not important 
     int original_index;
 } Sentence;
@@ -56,7 +56,7 @@ void compute_features(Sentence *s, int index, int total) {
     s->features[2] = feat_keywords(s->text);
 }
 
-// sigmoid actiavtion
+// Sigmoid activation for binary Maximum Entropy (Logistic Regression)
 double sigmoid(double x) {
     return 1.0 / (1.0 + exp(-x));
 }
@@ -69,26 +69,27 @@ double linear_sum(double weights[], double features[]) {
     return sum;
 }
 
+// Train using Maximum Entropy principle (Stochastic Gradient Descent)
 void train(Sentence *training_data, int training_count, double weights[]) {
     // initialising weights to 0
     for (int i = 0; i < NUM_FEATURES; i++) weights[i] = 0.0;
 
     for (int epoch = 0; epoch < EPOCHS; epoch++) {
         for (int s = 0; s < training_count; s++) {
-            // prediction
+            // prediction (P(y=1|x))
             double predicted = sigmoid(linear_sum(weights, training_data[s].features));
             double error     = training_data[s].label - predicted;
 
-            // updation
+            // weight update
             for (int f = 0; f < NUM_FEATURES; f++)
                 weights[f] += LEARNING_RATE * error * training_data[s].features[f];
         }
     }
 }
 
-// sort scores
-int compare_by_score(const void *a, const void *b) {
-    double diff = ((Sentence *)b)->score - ((Sentence *)a)->score;
+// Sort sentences by probability
+int compare_by_prob(const void *a, const void *b) {
+    double diff = ((Sentence *)b)->probability - ((Sentence *)a)->probability;
     return (diff > 0) ? 1 : -1;
 }
 
@@ -165,20 +166,20 @@ int main() {
     double weights[NUM_FEATURES];
     train(training_data, training_count, weights);
 
-    printf("Learned weights:  position=%.3f  length=%.3f  keywords=%.3f\n",
+    printf("Learned weights (MaxEnt):  position=%.3f  length=%.3f  keywords=%.3f\n",
            weights[0], weights[1], weights[2]);
 
     // inference
     for (int i = 0; i < article_count; i++) {
         compute_features(&article[i], i, article_count);
-        article[i].score = sigmoid(linear_sum(weights, article[i].features));
+        article[i].probability = sigmoid(linear_sum(weights, article[i].features));
     }
 
-    qsort(article, article_count, sizeof(Sentence), compare_by_score);
+    qsort(article, article_count, sizeof(Sentence), compare_by_prob);
 
-    printf("\n--- Summary (Top 3 Sentences) ---\n\n");
-    for (int i = 0; i < 3 && i < article_count; i++)
-        printf("-> %s\n", article[i].text);
+    printf("\n--- Probabilistic Importance Ranking (Maximum Entropy Model) ---\n\n");
+    for (int i = 0; i < article_count; i++)
+        printf("[P = %5.1f%%] -> %s\n", article[i].probability * 100.0, article[i].text);
 
     return 0;
 }
